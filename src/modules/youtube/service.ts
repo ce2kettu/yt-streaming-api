@@ -23,7 +23,7 @@ export class Video {
         video.id = obj.id.videoId;
         video.title = obj.snippet.title;
         video.artist = obj.snippet.channelTitle;
-        video.streamUrl = `${env.APP_PROTOCOL}://${env.APP_HOST}:${env.APP_PORT}/api/v1/music/stream?v=${video.id}`;
+        video.streamUrl = `${env.APP_PROTOCOL}://${env.APP_HOST}:${env.APP_PORT}/api/v1/music/streamChunk?v=${video.id}`;
         // thumbnails
 
         return video;
@@ -97,7 +97,8 @@ export class YoutubeService {
 
             return videos;
         } catch (err) {
-            throw new Error('Error searching videos: ' + err.message);
+            throw new Error(`Error searching videos (this is probably due to
+                 exceeded quota on YouTube API): ${err.message}`);
         }
     }
 
@@ -137,6 +138,7 @@ export class YoutubeService {
      * @return {number} The duration in milliseconds
      */
     private static parseVideoDuration(duration: string): number {
-        return moment.duration(duration).asMilliseconds();
+        return moment.duration(duration).asSeconds();
+        //return moment.duration(duration).asMilliseconds();
     }
 }
