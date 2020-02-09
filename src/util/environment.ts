@@ -4,6 +4,7 @@ import { resolve } from 'path';
 export interface IProcessEnv {
     NODE_ENV: string;
     YT_API_KEY: string;
+    API_KEY: string;
     APP_PORT: string;
     APP_HOST: string;
     APP_PROTOCOL: string;
