@@ -8,6 +8,9 @@ export function routeNotFound(req: Request, res: Response, next: NextFunction): 
 }
 
 export function errorMiddleware(err: HttpException, req: Request, res: Response, next: NextFunction): void {
-    const message = env.NODE_ENV === 'development' ? err.message : 'Something went wrong';
-    API.error(res, message.toString() + ' ' + err.stack);
+    if (env.NODE_ENV === 'development') {
+        res.json({ success: false, message: err.message, stack: err.stack });
+    } else {
+        res.json({ success: false, message: 'Something went wrong' });
+    }
 }
