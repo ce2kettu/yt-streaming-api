@@ -18,5 +18,6 @@ export class YoutubeRoutes {
         this.router.get('/stream/:videoId', this.controller.stream.bind(this.controller));
         // this.router.get('/predownload/:videoId', this.controller.predownload.bind(this.controller));
         this.router.get('/whitelist/:videoId', apiKey, this.controller.whitelist.bind(this.controller));
+        this.router.get('/verify/:videoId', apiKey, this.controller.checkVideoExists.bind(this.controller));
     }
 }

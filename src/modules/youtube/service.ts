@@ -42,10 +42,15 @@ export class Video {
     // }
 }
 
-async function http(request: string): Promise<any> {
+interface IReqResponse {
+    status: number;
+    body: any;
+}
+
+async function http(request: string): Promise<IReqResponse> {
     const response = await fetch(request);
     const body = await response.json();
-    return body;
+    return { status: response.status, body };
 }
 
 export class YoutubeService {
@@ -56,7 +61,7 @@ export class YoutubeService {
      * Fetches video duration
      *
      * @param {string} videoId YouTube video identifier
-     * @return {number} duration
+     * @return {Promise<number>} duration
      */
     public static async getVideoDuration(videoId: string): Promise<number> {
         try {
@@ -67,7 +72,7 @@ export class YoutubeService {
             };
             const videoInfo = await http(`https://www.googleapis.com/youtube/v3/videos?${this.buildQuery(params)}`);
 
-            return this.parseVideoDuration(videoInfo?.items?.[0]?.contentDetails?.duration);
+            return this.parseVideoDuration(videoInfo.body?.items?.[0]?.contentDetails?.duration);
         } catch (err) {
             throw new Error('Error fetching video info: ' + err.message);
         }
@@ -78,7 +83,7 @@ export class YoutubeService {
      *
      * @param {string} searchVal video name
      * @param {number} maxResults Maximum amount of results to return
-     * @return {Video[]} List of videos that match the query
+     * @return {Promise<Video[]>} List of videos that match the query
      */
     public static async searchVideos(searchVal: string, maxResults?: number): Promise<Video[]> {
         try {
@@ -90,7 +95,7 @@ export class YoutubeService {
             };
             const searchRes = await http(`https://www.googleapis.com/youtube/v3/search?${this.buildQuery(params)}`);
             const videos: Video[] = await Promise.all(
-                searchRes?.items.map(async (obj: any) => {
+                searchRes.body?.items.map(async (obj: any) => {
                     return await this.formatVideo(obj);
                 }),
             );
@@ -103,10 +108,29 @@ export class YoutubeService {
     }
 
     /**
+     * Checks whether a YouTube exists
+     *
+     * @param {string} videoId YouTube video identifier
+     * @return {Promise<boolean>} Result
+     */
+    public static async checkVideoExists(videoId: string): Promise<boolean> {
+        try {
+            const params = {
+                format: 'json',
+                url: `http://www.youtube.com/watch?v=${videoId}`,
+            };
+            const queryRes = await http(`https://www.youtube.com/oembed?${this.buildQuery(params)}`);
+            return (queryRes.status === 200);
+        } catch (err) {
+            throw new Error(`Error checking whether video exists: ${err.message}`);
+        }
+    }
+
+    /**
      * Parses a video from HTTP response and turns it into a Video object
      *
      * @param {object} video The video in question
-     * @return {Video} A video object
+     * @return {Promise<Video>} A video object
      */
     private static async formatVideo(obj: object): Promise<Video> {
         try {

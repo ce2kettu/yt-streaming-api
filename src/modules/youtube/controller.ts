@@ -160,6 +160,22 @@ export class YoutubeController {
         }
     }
 
+    public async checkVideoExists(req: Request, res: Response, next: NextFunction) {
+        try {
+            const videoId = req.params.videoId;
+
+            if (!videoId) {
+                return next(new BadRequestException('Required parameter \'v\' is missing'));
+            }
+
+            const result = await YoutubeService.checkVideoExists(videoId);
+            console.log('Result: ' + result);
+            return res.json({ success: result });
+        } catch (err) {
+            return next(new InternalServerException(err));
+        }
+    }
+
     public streamSong(res: Response, next: NextFunction, videoId: string) {
         try {
             const hash = md5(videoId);
@@ -234,6 +250,10 @@ export class YoutubeController {
 
             if (!videoId) {
                 return next(new BadRequestException('Required parameter \'v\' missing'));
+            }
+
+            if (this.allowedSongs.indexOf(videoId) !== -1) {
+                return API.response(res, 'Video is already whitelisted');
             }
 
             this.allowedSongs.push(videoId);
