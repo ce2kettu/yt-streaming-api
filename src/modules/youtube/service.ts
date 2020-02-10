@@ -2,44 +2,18 @@ import moment from 'moment';
 import fetch from 'node-fetch';
 import env from '../../util/environment';
 
-// tslint:disable: max-classes-per-file
-export class Thumbnail {
-    public type: string;
-    public url: string;
-    public width: number;
-    public height: number;
-}
-
 export class Video {
     public id: string;
     public duration: number;
     public title: string;
     public artist: string;
-    public thumbnails: Thumbnail[];
-    public streamUrl: string;
 
-    public static fromResponseObject(obj: any): Video {
-        const video = new Video();
-        video.id = obj.id.videoId;
-        video.title = obj.snippet.title;
-        video.artist = obj.snippet.channelTitle;
-        video.streamUrl = `${env.APP_PROTOCOL}://${env.APP_HOST}:${env.APP_PORT}/api/v1/music/streamChunk?v=${video.id}`;
-        // thumbnails
-
-        return video;
+    constructor(id: string, duration: number, title: string, artist: string) {
+        this.id = id;
+        this.duration = duration;
+        this.title = title;
+        this.artist = artist;
     }
-
-    // get streamUrl() {
-    //     return `${env.APP_PROTOCOL}://${env.APP_HOST}:${env.APP_PORT}/stream?v=${this.id}`;
-    // }
-
-    // get downloadUrl() {
-    //     return `${env.APP_PROTOCOL}://${env.APP_HOST}:${env.APP_PORT}/download?v=${this.id}`;
-    // }
-
-    // get youtubeUrl() {
-    //     return `https://www.youtube.com/watch?v=${this.id}`;
-    // }
 }
 
 interface IReqResponse {
@@ -71,8 +45,33 @@ export class YoutubeService {
                 key: env.YT_API_KEY,
             };
             const videoInfo = await http(`https://www.googleapis.com/youtube/v3/videos?${this.buildQuery(params)}`);
-
             return this.parseVideoDuration(videoInfo.body?.items?.[0]?.contentDetails?.duration);
+        } catch (err) {
+            throw new Error('Error fetching video info: ' + err.message);
+        }
+    }
+
+    /**
+     * Fetches video information
+     *
+     * @param {string} videoId YouTube video identifier
+     * @return {Promise<Video>} Result
+     */
+    public static async getVideoInfo(videoId: string): Promise<Video> {
+        try {
+            // We don't use YouTube API v3 here to save quota requests
+            const params = {
+                format: 'json',
+                url: `http://www.youtube.com/watch?v=${videoId}`,
+            };
+            const queryRes = await http(`https://www.youtube.com/oembed?${this.buildQuery(params)}`);
+
+            // Video not found
+            if (queryRes.status !== 200) { return null; }
+
+            const duration = await this.getVideoDuration(videoId);
+            const video = new Video(videoId, duration, queryRes.body?.title, queryRes.body?.author_name);
+            return video;
         } catch (err) {
             throw new Error('Error fetching video info: ' + err.message);
         }
@@ -129,14 +128,14 @@ export class YoutubeService {
     /**
      * Parses a video from HTTP response and turns it into a Video object
      *
-     * @param {object} video The video in question
+     * @param {any} videoObj The video in question
      * @return {Promise<Video>} A video object
      */
-    private static async formatVideo(obj: object): Promise<Video> {
+    private static async formatVideo(videoObj: any): Promise<Video> {
         try {
-            const video: Video = Video.fromResponseObject(obj);
-            const duration = await this.getVideoDuration(video.id);
-            video.duration = duration;
+            const videoId = videoObj.id.videoId;
+            const duration = await this.getVideoDuration(videoId);
+            const video = new Video(videoId, duration, videoObj.snippet.title, videoObj.snippet.channelTitle);
             return video;
         } catch (err) {
             throw new Error('Error formatting video: ' + err.message);
@@ -162,7 +161,6 @@ export class YoutubeService {
      * @return {number} The duration in milliseconds
      */
     private static parseVideoDuration(duration: string): number {
-        return moment.duration(duration).asSeconds();
-        //return moment.duration(duration).asMilliseconds();
+        return moment.duration(duration).asMilliseconds();
     }
 }

@@ -10,7 +10,6 @@ import fs from 'fs';
 import env from '../../util/environment';
 import md5 from 'md5';
 
-// tslint:disable: max-classes-per-file
 class CacheItem {
     private downloaded: boolean;
 
@@ -72,7 +71,6 @@ export class YoutubeController {
     public async stream(req: Request, res: Response, next: NextFunction) {
         try {
             const videoId = req.params.videoId;
-            console.log(req.headers);
 
             if (!videoId) {
                 return next(new BadRequestException('Required parameter \'v\' is missing'));
@@ -169,8 +167,22 @@ export class YoutubeController {
             }
 
             const result = await YoutubeService.checkVideoExists(videoId);
-            console.log('Result: ' + result);
             return res.json({ success: result });
+        } catch (err) {
+            return next(new InternalServerException(err));
+        }
+    }
+
+    public async getSongInfo(req: Request, res: Response, next: NextFunction) {
+        try {
+            const videoId = req.params.videoId;
+
+            if (!videoId) {
+                return next(new BadRequestException('Required parameter \'v\' is missing'));
+            }
+
+            const result = await YoutubeService.getVideoInfo(videoId);
+            return API.response(res, 'Retrieved song data', result);
         } catch (err) {
             return next(new InternalServerException(err));
         }

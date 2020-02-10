@@ -1,6 +1,5 @@
 import env from './environment';
 
-// tslint:disable: max-classes-per-file
 export class HttpException extends Error {
     public message: string;
 
