@@ -9,6 +9,7 @@ import { resolve } from 'path';
 import fs from 'fs';
 import env from '../../util/environment';
 import md5 from 'md5';
+import GrowingFile from 'growing-file';
 
 class CacheItem {
     private downloaded: boolean;
@@ -84,7 +85,7 @@ export class YoutubeController {
             const hash = md5(videoId);
 
             const videoStream = ytdl(videoId, { quality: 'highestaudio', filter: 'audioonly' });
-            videoStream.on('error', (err) => { throw err; });
+            videoStream.on('error', (err) => { console.log(err); });
 
             // Write response header
             res.writeHead(200, {
@@ -125,10 +126,10 @@ export class YoutubeController {
                 this.streamSong(res, next, videoId);
             } else {
                 const videoStream = ytdl(videoId, { quality: 'highestaudio', filter: 'audioonly' });
-                videoStream.on('error', (err) => { throw err; });
+                videoStream.on('error', (err) => { console.log(err); });
 
                 const writeStream = fs.createWriteStream(filePath);
-                writeStream.on('error', (err) => { throw err; });
+                writeStream.on('error', (err) => { console.log(err); });
 
                 // Create a new cache entry
                 this.songCache[videoId] = new CacheItem();
@@ -153,7 +154,133 @@ export class YoutubeController {
                     })
                     .pipe(writeStream, { end: true });
             }
+        } catch (err) {
+            return next(new InternalServerException(err));
+        }
+    }
 
+    public async streamClient(req: Request, res: Response, next: NextFunction) {
+        try {
+            const videoId = req.params.videoId;
+
+            if (!videoId) {
+                return next(new BadRequestException('Required parameter \'v\' is missing'));
+            }
+
+            const hash = md5(videoId);
+            const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
+
+            // Video is in cache
+            if (this.songCache[videoId]) {
+                res.writeHead(200, {
+                    'Content-Type': 'audio/mpeg',
+                    'Content-Disposition': `inline; filename="${hash}.mp3"`,
+                    'Connection': 'Keep-Alive',
+                });
+                const options = {
+                    timeout: 10000,
+                    interval: 100,
+                    startFromEnd: false,
+                };
+                const file = GrowingFile.open(filePath, options);
+                file.on('error', (err) => { console.log(err); });
+                file.pipe(res);
+            } else {
+                const videoStream = ytdl(videoId, { quality: 'highestaudio', filter: 'audioonly' });
+                videoStream.on('error', (err) => { console.log(err); });
+
+                const writeStream = fs.createWriteStream(filePath);
+                writeStream.on('error', (err) => { console.log(err); });
+
+                // Create a new cache entry
+                this.songCache[videoId] = new CacheItem();
+
+                setFfmpegPath(env.FFMPEG_PATH);
+
+                // Send compressed audio mp3 data
+                const audioStream = ffmpeg()
+                    .input(videoStream)
+                    .toFormat('mp3')
+                    .on('error', (err) => {
+                        console.log(err);
+                    })
+                    .on('end', () => {
+                        if (this.songCache[videoId]) {
+                            this.songCache[videoId].setDownloaded();
+                        } else {
+                            this.songCache[videoId] = new CacheItem(true);
+                        }
+                    })
+                    .pipe(writeStream, { end: true });
+
+                res.writeHead(200, {
+                    'Content-Type': 'audio/mpeg',
+                    'Content-Disposition': `inline; filename="${hash}.mp3"`,
+                    'Connection': 'Keep-Alive',
+                });
+                const options = {
+                    timeout: 10000,
+                    interval: 100,
+                    startFromEnd: false,
+                };
+                const file = GrowingFile.open(filePath, options);
+                file.on('error', (err) => { console.log(err); });
+                file.pipe(res);
+            }
+        } catch (err) {
+            return next(new InternalServerException(err));
+        }
+    }
+
+    public async streamChunk(req: Request, res: Response, next: NextFunction) {
+        try {
+            const videoId = req.params.videoId;
+
+            if (!videoId) {
+                return next(new BadRequestException('Required parameter \'v\' is missing'));
+            }
+
+            // Video is in cache
+            if (this.songCache[videoId]) {
+                await this.checkIsDownloaded(videoId);
+                this.streamSong(res, next, videoId);
+            } else {
+                return API.error(res, 'Video is not in cache');
+            }
+        } catch (err) {
+            return next(new InternalServerException(err));
+        }
+    }
+
+    public async streamChunked(req: Request, res: Response, next: NextFunction) {
+        try {
+            const videoId = req.params.videoId;
+
+            if (!videoId) {
+                return next(new BadRequestException('Required parameter \'v\' is missing'));
+            }
+
+            const hash = md5(videoId);
+            const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
+
+            // Video is in cache
+            if (this.songCache[videoId]) {
+                res.writeHead(200, {
+                    'Content-Type': 'audio/mpeg',
+                    'Content-Disposition': `inline; filename="${hash}.mp3"`,
+                    'Connection': 'Keep-Alive',
+                });
+                const options = {
+                    timeout: 3000,
+                    interval: 100,
+                    startFromEnd: false,
+                };
+                const file = GrowingFile.open(filePath, options);
+                file.on('error', (err) => { console.log(err); });
+                file.pipe(res);
+            } else {
+                return API.error(res, 'Video is not in cache');
+            }
         } catch (err) {
             return next(new InternalServerException(err));
         }
@@ -212,7 +339,7 @@ export class YoutubeController {
             });
 
             const readStream = fs.createReadStream(filePath)
-            readStream.on('error', (err) => { throw err; });
+            readStream.on('error', (err) => { console.log(err); });
             readStream.pipe(res);
         } catch (err) {
             return next(new InternalServerException(err));
@@ -236,10 +363,10 @@ export class YoutubeController {
             const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
 
             const videoStream = ytdl(videoId, { quality: 'highestaudio', filter: 'audioonly' });
-            videoStream.on('error', (err) => { throw err; });
+            videoStream.on('error', (err) => { console.log(err); });
 
             const writeStream = fs.createWriteStream(filePath);
-            writeStream.on('error', (err) => { throw err; });
+            writeStream.on('error', (err) => { console.log(err); });
 
             // Create a new cache entry
             this.songCache[videoId] = new CacheItem();
@@ -250,7 +377,7 @@ export class YoutubeController {
             const audioStream = ffmpeg()
                 .input(videoStream)
                 .toFormat('mp3')
-                .on('error', (err) => { throw err; })
+                .on('error', (err) => { console.log(err); })
                 .on('end', () => {
                     if (this.songCache[videoId]) {
                         this.songCache[videoId].setDownloaded();
