@@ -28,6 +28,7 @@ class CacheItem {
 
 export class YoutubeController {
     private static readonly SONG_PATH: string = '/cache/mp3';
+    private static readonly TOP_100_PLAYLIST_ID: string = 'PL4fGSI1pDJn69On1f-8NAvX_CYlx7QyZc';
     public songCache: CacheItem[];
     private allowedSongs: string[];
 
@@ -183,6 +184,15 @@ export class YoutubeController {
 
             const result = await YoutubeService.getVideoInfo(videoId);
             return API.response(res, 'Retrieved song data', result);
+        } catch (err) {
+            return next(new InternalServerException(err));
+        }
+    }
+
+    public async getTopCharts(req: Request, res: Response, next: NextFunction) {
+        try {
+            const result = await YoutubeService.getPlaylistData(YoutubeController.TOP_100_PLAYLIST_ID);
+            return API.response(res, 'Retrieved top 100 playlist', result);
         } catch (err) {
             return next(new InternalServerException(err));
         }

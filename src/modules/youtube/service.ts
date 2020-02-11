@@ -30,6 +30,7 @@ async function http(request: string): Promise<IReqResponse> {
 export class YoutubeService {
     /* Number of results to display */
     private static readonly MAX_RESULTS: number = 21;
+    private static readonly API_URL = 'https://www.googleapis.com/youtube/v3';
 
     /**
      * Fetches video duration
@@ -44,7 +45,7 @@ export class YoutubeService {
                 id: videoId,
                 key: env.YT_API_KEY,
             };
-            const videoInfo = await http(`https://www.googleapis.com/youtube/v3/videos?${this.buildQuery(params)}`);
+            const videoInfo = await http(`${this.API_URL}/videos?${this.buildQuery(params)}`);
             return this.parseVideoDuration(videoInfo.body?.items?.[0]?.contentDetails?.duration);
         } catch (err) {
             throw new Error('Error fetching video info: ' + err.message);
@@ -92,7 +93,7 @@ export class YoutubeService {
                 q: searchVal,
                 maxResults: maxResults || this.MAX_RESULTS,
             };
-            const searchRes = await http(`https://www.googleapis.com/youtube/v3/search?${this.buildQuery(params)}`);
+            const searchRes = await http(`${this.API_URL}/search?${this.buildQuery(params)}`);
             const videos: Video[] = await Promise.all(
                 searchRes.body?.items.map(async (obj: any) => {
                     return await this.formatVideo(obj);
@@ -103,6 +104,47 @@ export class YoutubeService {
         } catch (err) {
             throw new Error(`Error searching videos (this is probably due to
                  exceeded quota on YouTube API): ${err.message}`);
+        }
+    }
+
+    /**
+     * Returns YouTube playlist video identifiers
+     *
+     * @param {string} videoId YouTube playlist identifier
+     * @return {Promise<any[]>} Result
+     */
+    public static async getPlaylistData(playlistId: string): Promise<any[]> {
+        try {
+            const params = {
+                part: 'snippet',
+                key: env.YT_API_KEY,
+                maxResults: 50,
+                playlistId,
+            };
+            const queryRes = await http(`${this.API_URL}/playlistItems?${this.buildQuery(params)}`);
+
+            const videoIds: string[] = queryRes.body?.items.map((obj: any) => {
+                return obj.snippet.resourceId.videoId;
+            });
+
+            // There's a next page
+            // TODO: make it more universal, do requests till pageInfo.totalResults,
+            // 50 results is the maximum per page
+            if (queryRes.body.nextPageToken) {
+                const nextPage = await http(`${this.API_URL}/playlistItems?${this.buildQuery({
+                    pageToken: queryRes.body.nextPageToken,
+                    ...params,
+                })}`);
+                const ids: string[] = nextPage.body?.items.map((obj: any) => {
+                    return obj.snippet.resourceId.videoId;
+                });
+
+                videoIds.concat(ids);
+            }
+
+            return videoIds;
+        } catch (err) {
+            throw new Error(`Error checking whether video exists: ${err.message}`);
         }
     }
 
