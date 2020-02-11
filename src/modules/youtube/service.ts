@@ -58,7 +58,7 @@ export class YoutubeService {
      * @param {string} videoId YouTube video identifier
      * @return {Promise<Video>} Result
      */
-    public static async getVideoInfo(videoId: string): Promise<Video> {
+    public static async getVideoInfoOembed(videoId: string): Promise<Video> {
         try {
             // We don't use YouTube API v3 here to save quota requests
             const params = {
@@ -72,6 +72,33 @@ export class YoutubeService {
 
             const duration = await this.getVideoDuration(videoId);
             const video = new Video(videoId, duration, queryRes.body?.title, queryRes.body?.author_name);
+            return video;
+        } catch (err) {
+            throw new Error('Error fetching video info: ' + err.message);
+        }
+    }
+
+    /**
+     * Fetches video information
+     *
+     * @param {string} videoId YouTube video identifier
+     * @return {Promise<Video>} Result
+     */
+    public static async getVideoInfo(videoId: string): Promise<Video> {
+        try {
+            // We don't use YouTube API v3 here to save quota requests
+            const params = {
+                part: 'snippet,contentDetails',
+                id: videoId,
+                key: env.YT_API_KEY,
+            };
+            const videoInfo = await http(`${this.API_URL}/videos?${this.buildQuery(params)}`);
+
+            if (!videoInfo.body.items) { return null; }
+
+            const info = videoInfo.body.items[0];
+            const duration = this.parseVideoDuration(info?.contentDetails?.duration);
+            const video = new Video(videoId, duration, info.snippet.title, info.snippet.channelTitle);
             return video;
         } catch (err) {
             throw new Error('Error fetching video info: ' + err.message);
