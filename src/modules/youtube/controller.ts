@@ -276,7 +276,7 @@ export class YoutubeController {
                     startFromEnd: false,
                 };
                 const file = GrowingFile.open(filePath, options);
-                file.on('error', (err) => { console.log(err); });
+                file.on('error', (err) => next(new Error('Could not read the file: ' + err.message)));
                 file.pipe(res);
             } else {
                 return API.error(res, 'Video is not in cache');
@@ -339,7 +339,7 @@ export class YoutubeController {
             });
 
             const readStream = fs.createReadStream(filePath);
-            readStream.on('error', (err) => { console.log(err); });
+            readStream.on('error', (err) => next(new Error('Could not read the file: ' + err.message)));
             readStream.pipe(res);
         } catch (err) {
             return next(new InternalServerException(err));
@@ -363,10 +363,10 @@ export class YoutubeController {
             const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
 
             const videoStream = ytdl(videoId, { quality: 'highestaudio', filter: 'audioonly' });
-            videoStream.on('error', (err) => { next(new Error('Could not play the video: ' + err.message)); });
-            videoStream.on('data', () => {
+            videoStream.on('error', (err) => next(new Error('Could not play the song: ' + err.message)));
+            videoStream.on('response', () => {
                 const writeStream = fs.createWriteStream(filePath);
-                writeStream.on('error', (err) => { console.log(err); });
+                writeStream.on('error', (err) => next(new Error('Could not write to file: ' + err.message)));
 
                 // Create a new cache entry
                 this.songCache[videoId] = new CacheItem();
@@ -386,7 +386,7 @@ export class YoutubeController {
                         }
                     })
                     .pipe(writeStream, { end: true });
-                return API.response(res, 'The requested song is now being downloaded');
+                API.response(res, 'The requested song is now being downloaded');
             });
         } catch (err) {
             return next(new InternalServerException(err));
