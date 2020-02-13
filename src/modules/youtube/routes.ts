@@ -18,7 +18,7 @@ export class YoutubeRoutes {
         this.router.get('/stream/chunk/:videoId', this.controller.streamChunk.bind(this.controller));
         this.router.get('/stream/chunked/:videoId', this.controller.streamChunked.bind(this.controller));
         this.router.get('/predownload/:videoId', apiKey, this.controller.predownload.bind(this.controller));
-        this.router.get('/search/:searchQuery/:maxResults', apiKey, this.controller.search.bind(this.controller));
+        //this.router.get('/search/:searchQuery/:maxResults', apiKey, this.controller.search.bind(this.controller));
         this.router.get('/stream/:videoId', this.controller.stream.bind(this.controller));
         this.router.get('/whitelist/:videoId', apiKey, this.controller.whitelist.bind(this.controller));
         this.router.get('/verify/:videoId', apiKey, this.controller.checkVideoExists.bind(this.controller));
