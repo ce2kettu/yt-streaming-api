@@ -362,9 +362,9 @@ export class YoutubeController {
             const hash = md5(videoId);
             const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
 
-            const videoStream = ytdl(videoId, { quality: 'highestaudio', filter: 'audioonly' });
+            const videoStream = ytdl(videoId);
             videoStream.on('error', (err) => next(new Error('Could not play the song: ' + err.message)));
-            videoStream.on('response', () => {
+            videoStream.once('response', () => {
                 const writeStream = fs.createWriteStream(filePath);
                 writeStream.on('error', (err) => next(new Error('Could not write to file: ' + err.message)));
 
@@ -386,7 +386,7 @@ export class YoutubeController {
                         }
                     })
                     .pipe(writeStream, { end: true });
-                API.response(res, 'The requested song is now being downloaded');
+                return API.response(res, 'The requested song is now being downloaded');
             });
         } catch (err) {
             return next(new InternalServerException(err));
