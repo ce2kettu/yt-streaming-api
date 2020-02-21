@@ -29,7 +29,6 @@ class CacheItem {
 
 export class YoutubeController {
     private static readonly SONG_PATH: string = '/cache/mp3';
-    private static readonly TOP_100_PLAYLIST_ID: string = 'PL4fGSI1pDJn69On1f-8NAvX_CYlx7QyZc';
     public songCache: CacheItem[];
     private allowedSongs: string[];
 
@@ -56,11 +55,11 @@ export class YoutubeController {
 
     public async search(req: Request, res: Response, next: NextFunction) {
         try {
-            const query = req.query.q;
+            const query = req.params.searchQuery;
             const maxResults = req.params.maxResults ? parseInt(req.params.maxResults, 10) : null;
 
             if (!query) {
-                return next(new BadRequestException('Required parameter \'q\' missing'));
+                return next(new BadRequestException('Required parameter \'searchQuery\' missing'));
             }
 
             const data = await YoutubeService.searchVideos(query, maxResults);
@@ -75,7 +74,7 @@ export class YoutubeController {
             const videoId = req.params.videoId;
 
             if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' is missing'));
+                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
             }
 
             if (this.allowedSongs.indexOf(videoId) === -1) {
@@ -114,7 +113,7 @@ export class YoutubeController {
             const videoId = req.params.videoId;
 
             if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' is missing'));
+                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
             }
 
             const hash = md5(videoId);
@@ -164,7 +163,7 @@ export class YoutubeController {
             const videoId = req.params.videoId;
 
             if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' is missing'));
+                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
             }
 
             const hash = md5(videoId);
@@ -237,7 +236,7 @@ export class YoutubeController {
             const videoId = req.params.videoId;
 
             if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' is missing'));
+                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
             }
 
             // Video is in cache
@@ -257,7 +256,7 @@ export class YoutubeController {
             const videoId = req.params.videoId;
 
             if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' is missing'));
+                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
             }
 
             const hash = md5(videoId);
@@ -291,7 +290,7 @@ export class YoutubeController {
             const videoId = req.params.videoId;
 
             if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' is missing'));
+                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
             }
 
             const result = await YoutubeService.checkVideoExists(videoId);
@@ -306,7 +305,7 @@ export class YoutubeController {
             const videoId = req.params.videoId;
 
             if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' is missing'));
+                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
             }
 
             const result = await YoutubeService.getVideoInfo(videoId);
@@ -316,10 +315,16 @@ export class YoutubeController {
         }
     }
 
-    public async getTopCharts(req: Request, res: Response, next: NextFunction) {
+    public async getPlaylistInfo(req: Request, res: Response, next: NextFunction) {
         try {
-            const result = await YoutubeService.getPlaylistData(YoutubeController.TOP_100_PLAYLIST_ID);
-            return API.response(res, 'Retrieved top 100 playlist', result);
+            const playlistId = req.params.playlistId;
+
+            if (!playlistId) {
+                return next(new BadRequestException('Required parameter \'playlistId\' is missing'));
+            }
+
+            const result = await YoutubeService.getPlaylistData(playlistId);
+            return API.response(res, 'Retrieved playlist data', result);
         } catch (err) {
             return next(new InternalServerException(err));
         }
@@ -362,7 +367,7 @@ export class YoutubeController {
             const hash = md5(videoId);
             const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
 
-            const videoStream = ytdl(videoId);
+            const videoStream = ytdl(videoId, { quality: 'highestaudio' });
             videoStream.on('error', (err) => next(new Error('Could not play the song: ' + err.message)));
             videoStream.once('response', () => {
                 const writeStream = fs.createWriteStream(filePath);
