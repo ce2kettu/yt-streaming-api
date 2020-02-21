@@ -137,7 +137,7 @@ export class YoutubeService {
     /**
      * Returns YouTube playlist video identifiers
      *
-     * @param {string} videoId YouTube playlist identifier
+     * @param {string} playlistId YouTube playlist identifier
      * @return {Promise<any[]>} Result
      */
     public static async getPlaylistData(playlistId: string): Promise<any[]> {
@@ -150,23 +150,24 @@ export class YoutubeService {
             };
             const queryRes = await http(`${this.API_URL}/playlistItems?${this.buildQuery(params)}`);
 
-            const videoIds: string[] = queryRes.body?.items.map((obj: any) => {
+            let videoIds: string[] = queryRes.body?.items.map((obj: any) => {
                 return obj.snippet.resourceId.videoId;
             });
 
-            // There's a next page
-            // TODO: make it more universal, do requests till pageInfo.totalResults,
-            // 50 results is the maximum per page
-            if (queryRes.body.nextPageToken) {
+            let nextPageToken = queryRes.body.nextPageToken;
+
+            // Fetch all songs till no next page is available
+            while (nextPageToken) {
                 const nextPage = await http(`${this.API_URL}/playlistItems?${this.buildQuery({
-                    pageToken: queryRes.body.nextPageToken,
+                    pageToken: nextPageToken,
                     ...params,
                 })}`);
                 const ids: string[] = nextPage.body?.items.map((obj: any) => {
                     return obj.snippet.resourceId.videoId;
                 });
 
-                videoIds.concat(ids);
+                videoIds = [].concat(videoIds, ids);
+                nextPageToken = nextPage.body.nextPageToken;
             }
 
             return videoIds;
