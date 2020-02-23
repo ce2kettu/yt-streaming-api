@@ -366,32 +366,39 @@ export class YoutubeController {
 
             const hash = md5(videoId);
             const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
+            const audio = ytdl(videoId, { quality: 'highestaudio' });
+            setFfmpegPath(env.FFMPEG_PATH);
 
-            const videoStream = ytdl(videoId, { quality: 'highestaudio' });
-            videoStream.on('error', (err) => next(new Error('Could not play the song: ' + err.message)));
-            videoStream.once('response', () => {
-                const writeStream = fs.createWriteStream(filePath);
-                writeStream.on('error', (err) => next(new Error('Could not write to file: ' + err.message)));
+            audio.on('error', (err) => next(new Error('Could not play the song: ' + err.message)));
 
-                // Create a new cache entry
-                this.songCache[videoId] = new CacheItem();
+            let isResolved = false;
+            audio.on('progress', () => {
+                if (!isResolved) {
+                    const writeStream = fs.createWriteStream(filePath);
+                    writeStream.on('error', (err) => next(new Error('Could not write to file: ' + err.message)));
 
-                setFfmpegPath(env.FFMPEG_PATH);
+                    // Create a new cache entry
+                    this.songCache[videoId] = new CacheItem();
 
-                // Send compressed audio mp3 data
-                const audioStream = ffmpeg()
-                    .input(videoStream)
-                    .toFormat('mp3')
-                    .on('error', (err) => { console.log(err); })
-                    .on('end', () => {
-                        if (this.songCache[videoId]) {
-                            this.songCache[videoId].setDownloaded();
-                        } else {
-                            this.songCache[videoId] = new CacheItem(true);
-                        }
-                    })
-                    .pipe(writeStream, { end: true });
-                return API.response(res, 'The requested song is now being downloaded');
+                    setFfmpegPath(env.FFMPEG_PATH);
+
+                    // Convert to compressed mp3 audio
+                    ffmpeg(audio)
+                        .audioBitrate(128)
+                        .format('mp3')
+                        .on('error', (err) => { console.log(err); })
+                        .on('end', () => {
+                            if (this.songCache[videoId]) {
+                                this.songCache[videoId].setDownloaded();
+                            } else {
+                                this.songCache[videoId] = new CacheItem(true);
+                            }
+                        })
+                        .pipe(writeStream, { end: true });
+
+                    isResolved = true;
+                    return API.response(res, 'The requested song is now being downloaded');
+                }
             });
         } catch (err) {
             return next(new InternalServerException(err));
