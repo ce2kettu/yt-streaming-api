@@ -50,12 +50,50 @@ FFMPEG_PATH=ffmpeg
 
 ##### Run in production mode
 ```shell
-yarn run start:prod
+npm run start:prod
 ```
 ##### Run in development mode
 ```shell
-yarn start
+npm start
 ```
+
+## Docker
+
+##### Build Docker image
+```shell
+docker build -t <your-image-name> .
+```
+
+#### Run image in detached mode
+
+```shell
+docker run -d -p <port-on-host>:<port-inside-docker-container> <your-image-name>
+```
+
+#### Run image in foreground mode
+
+```shell
+docker run -i -t -p <port-on-host>:<port-inside-docker-container> <your-image-name>
+```
+
+### Stop Docker container
+
+#### Detached mode
+
+```shell
+docker stop <container-id>
+```
+
+You can get a list of all running Docker container and its ids by following command
+
+```shell
+docker images
+```
+
+#### Foreground mode
+
+Go to console and press <CTRL> + C at any time.
+
 
 ## List of API Routes
 
