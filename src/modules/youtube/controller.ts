@@ -90,14 +90,14 @@ export class YoutubeController {
     /** Opens a file and streams it to the client */
     private streamFile(filePath: string, res: Response, next: NextFunction) {
         const file = GrowingFile.open(filePath, YoutubeController.FILE_OPTIONS);
-        file.on('error', (err) => next(new Error('Could not read the file: ' + err.message)));
+        file.on('error', (err) => next(new InternalServerException('Could not read the file: ' + err.message)));
         file.pipe(res);
     }
 
     /** Converts the audio stream to mp3 and adds the song to cache  */
     private addSongToCache(videoId: string, filePath: string, audioStream: any, next: NextFunction) {
         const writeStream = fs.createWriteStream(filePath);
-        writeStream.on('error', (err) => next(new Error('Could not write to file: ' + err.message)));
+        writeStream.on('error', (err) => next(new InternalServerException('Could not write to file: ' + err.message)));
 
         // Create a new cache entry
         this.songCache[videoId] = new CacheItem(md5(videoId));
@@ -180,7 +180,8 @@ export class YoutubeController {
                 this.streamFile(filePath, res, next);
             } else {
                 const audio = ytdl(videoId, { quality: 'highestaudio' });
-                audio.on('error', (err) => next(new Error('Could not play the song: ' + err.message)));
+                audio.on('error', (err) =>
+                    next(new InternalServerException('Could not play the song: ' + err.message)));
 
                 this.addSongToCache(videoId, filePath, audio, next);
                 this.streamFile(filePath, res, next);
@@ -222,7 +223,7 @@ export class YoutubeController {
             const hash = md5(videoId);
             const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
             const audio = ytdl(videoId, { quality: 'highestaudio' });
-            audio.on('error', (err) => next(new Error('Could not play the song: ' + err.message)));
+            audio.on('error', (err) => next(new InternalServerException('Could not play the song: ' + err.message)));
 
             // We have to work with this event since 'response' is not always called
             let isResolved = false;

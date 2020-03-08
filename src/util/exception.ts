@@ -10,9 +10,9 @@ export class HttpException extends Error {
 }
 
 export class InternalServerException extends HttpException {
-    constructor(error?: string) {
-        error = (env.NODE_ENV === 'development') ? error : 'Something went wrong';
-        super(error);
+    constructor(message?: string) {
+        message = (env.NODE_ENV === 'development') ? message : 'Something went wrong';
+        super(message);
     }
 }
 
