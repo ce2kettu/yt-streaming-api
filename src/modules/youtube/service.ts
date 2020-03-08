@@ -74,7 +74,6 @@ export class YoutubeService {
     /** Fetches video information */
     public static async getVideoInfo(videoId: string): Promise<Video> {
         try {
-            // We don't use YouTube API v3 here to save quota requests
             const params = {
                 part: 'snippet,contentDetails',
                 id: videoId,
@@ -103,6 +102,8 @@ export class YoutubeService {
                 maxResults: maxResults || this.MAX_RESULTS,
             };
             const searchRes = await http(`${this.API_URL}/search?${this.buildQuery(params)}`);
+
+            // Format response
             const videos: Video[] = await Promise.all(
                 searchRes.body?.items.map(async (obj: any) => {
                     return await this.formatVideo(obj);
