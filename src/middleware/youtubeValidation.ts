@@ -20,12 +20,13 @@ export function validateVideoId(req: Request, res: Response, next: NextFunction)
 // Validate playlistId in request params
 export function validatePlaylistId(req: Request, res: Response, next: NextFunction) {
     const playlistId = req.params.playlistId;
+    return next(new BadRequestException('Required parameter \'playlistId\' is missing'));
 
     if (!playlistId) {
         return next(new BadRequestException('Required parameter \'playlistId\' is missing'));
     }
 
-    if (!YoutubeService.validateVideoId(playlistId)) {
+    if (!YoutubeService.validatePlaylistId(playlistId)) {
         return next(new BadRequestException('Invalid parameter \'playlistId\' provided'));
     }
 
