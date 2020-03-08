@@ -76,7 +76,7 @@ yarn start
 
 ### Endpoints and interaction
 
-#####Status
+##### Status
 Example: `GET /api/status` returns server status:
 
 ```json
@@ -87,7 +87,7 @@ Example: `GET /api/status` returns server status:
 }
 ```
 
-#####Search
+##### Search
 Server can perform a search for songs at `/api/music/search` endpoint. You can remove the apiKey middleware to make this available for clients as well.
 Example: `GET /api/music/search?q=Lady Gaga&maxResults=10&key=not_so_secure`:
 
@@ -107,11 +107,11 @@ Example: `GET /api/music/search?q=Lady Gaga&maxResults=10&key=not_so_secure`:
 }
 ```
 
-#####Stream
+##### Stream
 Clients can stream any song they want using `/api/music/stream` endpoint. You should remove this endpoint if you do not wish for this kind of behavior, but instead want the server to "whitelist" songs that can be played. The audio is cached by default for future requests.
 Example: `GET /api/music/stream/5L6xyaeiV58` returns a playable mp3 audio stream.
 
-#####Predownload
+##### Predownload
 Server can predownload a song to make it available for clients to play. The audio is cached by default for future requests.
 Example: `GET /api/music/predownload/5L6xyaeiV58&key=not_so_secure`:
 
@@ -122,10 +122,10 @@ Example: `GET /api/music/predownload/5L6xyaeiV58&key=not_so_secure`:
   "data": null
 }
 ```
-#####Stream with server validation
+##### Stream with server validation
 Example: `GET /api/music/stream/chunked/5L6xyaeiV58` returns a playable mp3 audio stream only if the server has predownloaded it. This way the server can ensure that clients cannot flood the server with requests that are not allowed.
 
-#####Verify that a song exists
+##### Verify that a song exists
 Returns whether a song is a valid.
 Example: `GET /api/music/verify/5L6xyaeiV58&key=not_so_secure`:
 
@@ -136,7 +136,7 @@ Example: `GET /api/music/verify/5L6xyaeiV58&key=not_so_secure`:
 }
 ```
 
-#####Get song data
+##### Get song data
 Example: `GET /api/music/song/5L6xyaeiV58&key=not_so_secure`:
 
 ```json
@@ -152,7 +152,7 @@ Example: `GET /api/music/song/5L6xyaeiV58&key=not_so_secure`:
 }
 ```
 
-#####Playlist data
+##### Playlist data
 Example: `GET /api/music/playlist/PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG&key=not_so_secure`:
 
 ```json
