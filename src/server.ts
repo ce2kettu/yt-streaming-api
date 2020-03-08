@@ -33,7 +33,7 @@ export class Server {
     }
 
     private initRoutes() {
-        this.app.use('/api/v1', routes);
+        this.app.use('/api', routes);
     }
 
     private routeNotFound() {
