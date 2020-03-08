@@ -24,4 +24,4 @@ process.env.__basedir = resolve(__dirname, '../../');
 // Load configuration variables
 config({ path: resolve(__dirname, `../../.env.${process.env.NODE_ENV}`) });
 
-export default process.env;
+export const env = process.env;

@@ -1,6 +1,6 @@
 import { Router } from 'express';
-import { YoutubeRoutes } from '../modules/youtube/routes';
-import { API } from '../util/api';
+import { YoutubeRoutes } from '../modules/youtube';
+import { API } from '../util';
 
 const routes = Router();
 

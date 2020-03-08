@@ -1,15 +1,13 @@
 import { Request, Response, NextFunction } from 'express';
-import { API } from '../../util/api';
-import { YoutubeService } from './service';
-import { BadRequestException, InternalServerException } from '../../util/exception';
+import { resolve, basename } from 'path';
+import fs from 'fs';
+import md5 from 'md5';
 import findRemoveSync from 'find-remove';
 import ffmpeg, { setFfmpegPath } from 'fluent-ffmpeg';
 import ytdl from 'ytdl-core';
-import { resolve, basename } from 'path';
-import fs from 'fs';
-import env from '../../util/environment';
-import md5 from 'md5';
 import GrowingFile from 'growing-file';
+import { YoutubeService } from './service';
+import { env, API, BadRequestException, InternalServerException } from '../../util';
 
 class CacheItem {
     private downloaded: boolean;
@@ -35,6 +33,11 @@ class CacheItem {
 
 export class YoutubeController {
     private static readonly SONG_PATH: string = '/cache/mp3';
+    private static readonly FILE_OPTIONS: object = {
+        timeout: 10000,
+        interval: 100,
+        startFromEnd: false,
+    };
     public songCache: CacheItem[];
     private allowedSongs: string[];
     private deleteTask: NodeJS.Timeout;
@@ -48,7 +51,7 @@ export class YoutubeController {
         this.deleteTask = setInterval(this.deleteSongs, 1000 * 60 * 10);
     }
 
-    // Removes mp3 files older than an hour from cache.
+    /** Removes mp3 files older than an hour from cache folder and song cache. */
     private deleteSongs() {
         console.log('Deleting songs from cache');
 
@@ -76,106 +79,51 @@ export class YoutubeController {
         }
     }
 
+    /** Returns search result */
     public async search(req: Request, res: Response, next: NextFunction) {
         try {
-            const query = req.params.searchQuery;
-            const maxResults = req.params.maxResults ? parseInt(req.params.maxResults, 10) : null;
+            const searchQuery = req.query.q;
+            const maxResults = req.query.maxResults ? parseInt(req.params.maxResults, 10) : null;
 
-            if (!query) {
-                return next(new BadRequestException('Required parameter \'searchQuery\' missing'));
+            if (!searchQuery) {
+                return next(new BadRequestException('Required parameter \'q\' missing'));
             }
 
-            const data = await YoutubeService.searchVideos(query, maxResults);
+            const data = await YoutubeService.searchVideos(searchQuery, maxResults);
             return API.response(res, 'Retrived search result', data);
         } catch (err) {
             return next(new InternalServerException(err));
         }
     }
 
-    public async stream(req: Request, res: Response, next: NextFunction) {
+    /** Returns whether a video exists with the provided id */
+    public async checkVideoExists(req: Request, res: Response, next: NextFunction) {
         try {
             const videoId = req.params.videoId;
-
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
-            }
-
-            if (this.allowedSongs.indexOf(videoId) === -1) {
-                return next(new BadRequestException('Invalid request'));
-            }
-
-            const hash = md5(videoId);
-
-            const videoStream = ytdl(videoId, { quality: 'highestaudio', filter: 'audioonly' });
-            videoStream.on('error', (err) => { console.log(err); });
-
-            // Write response header
-            res.writeHead(200, {
-                'Content-Type': 'audio/mpeg',
-                'Content-Disposition': `inline; filename="${hash}.mp3"`,
-                'Connection': 'Keep-Alive',
-                'Accept-Ranges': 'none',
-            });
-
-            // Send compressed audio mp3 data
-            const audioStream = ffmpeg()
-                .input(videoStream)
-                .toFormat('mp3')
-                .on('error', (err) => {
-                    console.log(err);
-                })
-                .pipe(res, { end: true });
-
+            const result = await YoutubeService.isVideoValid(videoId);
+            return res.json({ success: result });
         } catch (err) {
             return next(new InternalServerException(err));
         }
     }
 
-    public async streamCached(req: Request, res: Response, next: NextFunction) {
+    /** Returns song information */
+    public async getSongInfo(req: Request, res: Response, next: NextFunction) {
         try {
             const videoId = req.params.videoId;
+            const result = await YoutubeService.getVideoInfo(videoId);
+            return API.response(res, 'Retrieved song data', result);
+        } catch (err) {
+            return next(new InternalServerException(err));
+        }
+    }
 
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
-            }
-
-            const hash = md5(videoId);
-            const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
-
-            // Video is in cache
-            if (this.songCache[videoId]) {
-                await this.checkIsDownloaded(videoId);
-                this.streamSong(res, next, videoId);
-            } else {
-                const videoStream = ytdl(videoId, { quality: 'highestaudio', filter: 'audioonly' });
-                videoStream.on('error', (err) => { console.log(err); });
-
-                const writeStream = fs.createWriteStream(filePath);
-                writeStream.on('error', (err) => { console.log(err); });
-
-                // Create a new cache entry
-                this.songCache[videoId] = new CacheItem(hash);
-
-                setFfmpegPath(env.FFMPEG_PATH);
-
-                // Send compressed audio mp3 data
-                const audioStream = ffmpeg()
-                    .input(videoStream)
-                    .toFormat('mp3')
-                    .on('error', (err) => {
-                        console.log(err);
-                    })
-                    .on('end', () => {
-                        if (this.songCache[videoId]) {
-                            this.songCache[videoId].setDownloaded();
-                        } else {
-                            this.songCache[videoId] = new CacheItem(hash, true);
-                        }
-
-                        this.streamSong(res, next, videoId);
-                    })
-                    .pipe(writeStream, { end: true });
-            }
+    /** Returns playlist data */
+    public async getPlaylistInfo(req: Request, res: Response, next: NextFunction) {
+        try {
+            const playlistId = req.params.playlistId;
+            const result = await YoutubeService.getPlaylistData(playlistId);
+            return API.response(res, 'Retrieved playlist data', result);
         } catch (err) {
             return next(new InternalServerException(err));
         }
@@ -184,11 +132,6 @@ export class YoutubeController {
     public async streamClient(req: Request, res: Response, next: NextFunction) {
         try {
             const videoId = req.params.videoId;
-
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
-            }
-
             const hash = md5(videoId);
             const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
 
@@ -199,12 +142,7 @@ export class YoutubeController {
                     'Content-Disposition': `inline; filename="${hash}.mp3"`,
                     'Connection': 'Keep-Alive',
                 });
-                const options = {
-                    timeout: 10000,
-                    interval: 100,
-                    startFromEnd: false,
-                };
-                const file = GrowingFile.open(filePath, options);
+                const file = GrowingFile.open(filePath, YoutubeController.FILE_OPTIONS);
                 file.on('error', (err) => { console.log(err); });
                 file.pipe(res);
             } else {
@@ -240,34 +178,10 @@ export class YoutubeController {
                     'Content-Disposition': `inline; filename="${hash}.mp3"`,
                     'Connection': 'Keep-Alive',
                 });
-                const options = {
-                    timeout: 10000,
-                    interval: 100,
-                    startFromEnd: false,
-                };
-                const file = GrowingFile.open(filePath, options);
+
+                const file = GrowingFile.open(filePath, YoutubeController.FILE_OPTIONS);
                 file.on('error', (err) => { console.log(err); });
                 file.pipe(res);
-            }
-        } catch (err) {
-            return next(new InternalServerException(err));
-        }
-    }
-
-    public async streamChunk(req: Request, res: Response, next: NextFunction) {
-        try {
-            const videoId = req.params.videoId;
-
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
-            }
-
-            // Video is in cache
-            if (this.songCache[videoId]) {
-                await this.checkIsDownloaded(videoId);
-                this.streamSong(res, next, videoId);
-            } else {
-                return API.error(res, 'Video is not in cache');
             }
         } catch (err) {
             return next(new InternalServerException(err));
@@ -277,11 +191,6 @@ export class YoutubeController {
     public async streamChunked(req: Request, res: Response, next: NextFunction) {
         try {
             const videoId = req.params.videoId;
-
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
-            }
-
             const hash = md5(videoId);
             const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
 
@@ -292,12 +201,8 @@ export class YoutubeController {
                     'Content-Disposition': `inline; filename="${hash}.mp3"`,
                     'Connection': 'Keep-Alive',
                 });
-                const options = {
-                    timeout: 10000,
-                    interval: 100,
-                    startFromEnd: false,
-                };
-                const file = GrowingFile.open(filePath, options);
+
+                const file = GrowingFile.open(filePath, YoutubeController.FILE_OPTIONS);
                 file.on('error', (err) => next(new Error('Could not read the file: ' + err.message)));
                 file.pipe(res);
             } else {
@@ -308,83 +213,9 @@ export class YoutubeController {
         }
     }
 
-    public async checkVideoExists(req: Request, res: Response, next: NextFunction) {
-        try {
-            const videoId = req.params.videoId;
-
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
-            }
-
-            const result = await YoutubeService.isVideoValid(videoId);
-            return res.json({ success: result });
-        } catch (err) {
-            return next(new InternalServerException(err));
-        }
-    }
-
-    public async getSongInfo(req: Request, res: Response, next: NextFunction) {
-        try {
-            const videoId = req.params.videoId;
-
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'videoId\' is missing'));
-            }
-
-            const result = await YoutubeService.getVideoInfo(videoId);
-            return API.response(res, 'Retrieved song data', result);
-        } catch (err) {
-            return next(new InternalServerException(err));
-        }
-    }
-
-    public async getPlaylistInfo(req: Request, res: Response, next: NextFunction) {
-        try {
-            const playlistId = req.params.playlistId;
-
-            if (!playlistId) {
-                return next(new BadRequestException('Required parameter \'playlistId\' is missing'));
-            }
-
-            const result = await YoutubeService.getPlaylistData(playlistId);
-            return API.response(res, 'Retrieved playlist data', result);
-        } catch (err) {
-            return next(new InternalServerException(err));
-        }
-    }
-
-    public streamSong(res: Response, next: NextFunction, videoId: string) {
-        try {
-            const hash = md5(videoId);
-            const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
-
-            // Write response header
-            res.writeHead(200, {
-                'Content-Type': 'audio/mpeg',
-                'Content-Disposition': `inline; filename="${hash}.mp3"`,
-                'Connection': 'Keep-Alive',
-                'Content-Length': fs.statSync(filePath).size,
-            });
-
-            const readStream = fs.createReadStream(filePath);
-            readStream.on('error', (err) => next(new Error('Could not read the file: ' + err.message)));
-            readStream.pipe(res);
-        } catch (err) {
-            return next(new InternalServerException(err));
-        }
-    }
-
     public async predownload(req: Request, res: Response, next: NextFunction) {
         try {
             const videoId = req.params.videoId;
-
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' missing'));
-            }
-
-            if (!ytdl.validateID(videoId)) {
-                return next(new BadRequestException('Invalid parameter \'v\' provided'));
-            }
 
             // Song is already in cache
             if (this.songCache[videoId]) {
@@ -431,42 +262,5 @@ export class YoutubeController {
         } catch (err) {
             return next(new InternalServerException(err));
         }
-    }
-
-    public async whitelist(req: Request, res: Response, next: NextFunction) {
-        try {
-            const videoId = req.params.videoId;
-
-            if (!videoId) {
-                return next(new BadRequestException('Required parameter \'v\' missing'));
-            }
-
-            if (!ytdl.validateID(videoId)) {
-                return next(new BadRequestException('Invalid parameter \'v\' provided'));
-            }
-
-            if (this.allowedSongs.indexOf(videoId) !== -1) {
-                return API.response(res, 'Video is already whitelisted');
-            }
-
-            this.allowedSongs.push(videoId);
-            return API.response(res, 'Video whitelisted');
-        } catch (err) {
-            return next(new InternalServerException(err));
-        }
-    }
-
-    private async checkIsDownloaded(videoId: string): Promise<any> {
-        // tslint:disable-next-line: no-shadowed-variable
-        return new Promise((resolve) => {
-            function checkFlag() {
-                if (this.songCache[videoId] && this.songCache[videoId].isDownloaded()) {
-                    resolve();
-                } else {
-                    setTimeout(checkFlag.bind(this), 1000);
-                }
-            }
-            checkFlag.bind(this)();
-        });
     }
 }

@@ -4,8 +4,8 @@ import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
 import routes from './routes';
-import env from './util/environment';
-import { errorMiddleware, routeNotFound } from './middleware/error';
+import { env } from './util';
+import { errorMiddleware, routeNotFound } from './middleware';
 
 export class Server {
     private app: express.Application;

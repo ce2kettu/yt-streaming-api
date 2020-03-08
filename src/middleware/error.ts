@@ -1,7 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
-import { HttpException } from '../util/exception';
-import { API } from '../util/api';
-import env from '../util/environment';
+import { API, env, HttpException } from '../util';
 
 export function routeNotFound(req: Request, res: Response, next: NextFunction): void {
     API.error(res, 'Not Found');

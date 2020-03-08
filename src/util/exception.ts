@@ -1,4 +1,4 @@
-import env from './environment';
+import { env } from './environment';
 
 export class HttpException extends Error {
     public message: string;

@@ -1,6 +1,6 @@
 import moment from 'moment';
 import fetch from 'node-fetch';
-import env from '../../util/environment';
+import { env } from '../../util';
 
 export class Video {
     public id: string;
@@ -28,11 +28,12 @@ async function http(request: string): Promise<IReqResponse> {
 }
 
 export class YoutubeService {
-    /* Number of results to display */
     private static readonly MAX_RESULTS: number = 21;
     private static readonly API_URL = 'https://www.googleapis.com/youtube/v3';
     private static readonly VIDEO_URL = 'http://www.youtube.com/watch?v=';
     private static readonly OEMBED_URL = 'https://www.youtube.com/oembed';
+    private static readonly VIDEO_ID_REGEX = /^[a-zA-Z0-9-_]{11}$/;
+    private static readonly PLAYLIST_ID_REGEX = /^[a-zA-Z0-9-_]{34}$/;
 
     /** Fetches video duration */
     public static async getVideoDuration(videoId: string): Promise<number> {
@@ -132,7 +133,7 @@ export class YoutubeService {
 
             let nextPageToken = queryRes.body.nextPageToken;
 
-            // Fetch all songs till no next page is available
+            // Fetch all songs until no next page is available
             while (nextPageToken) {
                 const nextPage = await http(`${this.API_URL}/playlistItems?${this.buildQuery({
                     pageToken: nextPageToken,
@@ -188,5 +189,15 @@ export class YoutubeService {
     /** Converts duration in ISO 8601 format to milliseconds */
     private static parseVideoDuration(duration: string): number {
         return moment.duration(duration).asMilliseconds();
+    }
+
+    /** Returns true if given id satifies YouTube's video id format. */
+    public static validateVideoId(videoId: string) {
+        return this.VIDEO_ID_REGEX.test(videoId);
+    }
+
+    /** Returns true if given id satifies YouTube's playlist id format. */
+    public static validatePlaylistId(videoId: string) {
+        return this.PLAYLIST_ID_REGEX.test(videoId);
     }
 }
