@@ -2,7 +2,7 @@ import { config } from 'dotenv';
 import { resolve } from 'path';
 
 export interface IProcessEnv {
-    NODE_ENV: string;
+    NODE_ENV: 'production' | 'development';
     YT_API_KEY: string;
     API_KEY: string;
     APP_PORT: string;

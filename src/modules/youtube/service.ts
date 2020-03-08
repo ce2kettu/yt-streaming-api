@@ -31,13 +31,10 @@ export class YoutubeService {
     /* Number of results to display */
     private static readonly MAX_RESULTS: number = 21;
     private static readonly API_URL = 'https://www.googleapis.com/youtube/v3';
+    private static readonly VIDEO_URL = 'http://www.youtube.com/watch?v=';
+    private static readonly OEMBED_URL = 'https://www.youtube.com/oembed';
 
-    /**
-     * Fetches video duration
-     *
-     * @param {string} videoId YouTube video identifier
-     * @return {Promise<number>} duration
-     */
+    /** Fetches video duration */
     public static async getVideoDuration(videoId: string): Promise<number> {
         try {
             const params = {
@@ -52,12 +49,7 @@ export class YoutubeService {
         }
     }
 
-    /**
-     * Fetches video information
-     *
-     * @param {string} videoId YouTube video identifier
-     * @return {Promise<Video>} Result
-     */
+    /** Fetches video information */
     public static async getVideoInfoOembed(videoId: string): Promise<Video> {
         try {
             // We don't use YouTube API v3 here to save quota requests
@@ -78,12 +70,7 @@ export class YoutubeService {
         }
     }
 
-    /**
-     * Fetches video information
-     *
-     * @param {string} videoId YouTube video identifier
-     * @return {Promise<Video>} Result
-     */
+    /** Fetches video information */
     public static async getVideoInfo(videoId: string): Promise<Video> {
         try {
             // We don't use YouTube API v3 here to save quota requests
@@ -105,13 +92,7 @@ export class YoutubeService {
         }
     }
 
-    /**
-     * Searches for a video with the specified query
-     *
-     * @param {string} searchVal video name
-     * @param {number} maxResults Maximum amount of results to return
-     * @return {Promise<Video[]>} List of videos that match the query
-     */
+    /** Searches for a video with the specified query */
     public static async searchVideos(searchVal: string, maxResults?: number): Promise<Video[]> {
         try {
             const params = {
@@ -134,12 +115,7 @@ export class YoutubeService {
         }
     }
 
-    /**
-     * Returns YouTube playlist video identifiers
-     *
-     * @param {string} playlistId YouTube playlist identifier
-     * @return {Promise<any[]>} Result
-     */
+    /** Returns YouTube playlist video identifiers */
     public static async getPlaylistData(playlistId: string): Promise<any[]> {
         try {
             const params = {
@@ -176,31 +152,21 @@ export class YoutubeService {
         }
     }
 
-    /**
-     * Checks whether a YouTube exists
-     *
-     * @param {string} videoId YouTube video identifier
-     * @return {Promise<boolean>} Result
-     */
-    public static async checkVideoExists(videoId: string): Promise<boolean> {
+    /** Checks whether a YouTube exists */
+    public static async isVideoValid(videoId: string): Promise<boolean> {
         try {
             const params = {
                 format: 'json',
-                url: `http://www.youtube.com/watch?v=${videoId}`,
+                url: this.VIDEO_URL + videoId,
             };
-            const queryRes = await http(`https://www.youtube.com/oembed?${this.buildQuery(params)}`);
+            const queryRes = await http(`${this.OEMBED_URL}?${this.buildQuery(params)}`);
             return (queryRes.status === 200);
         } catch (err) {
             throw new Error(`Error checking whether video exists: ${err.message}`);
         }
     }
 
-    /**
-     * Parses a video from HTTP response and turns it into a Video object
-     *
-     * @param {any} videoObj The video in question
-     * @return {Promise<Video>} A video object
-     */
+    /** Parses a video from HTTP response and turns it into a Video object */
     private static async formatVideo(videoObj: any): Promise<Video> {
         try {
             const videoId = videoObj.id.videoId;
@@ -212,24 +178,14 @@ export class YoutubeService {
         }
     }
 
-    /**
-     * Builds a query with the specified params for a HTTP request
-     *
-     * @param {object} params An object containing all the parameters with their corresponding values
-     * @return {string} Encoded query
-     */
+    /** Builds a query with the specified params for a HTTP request */
     private static buildQuery(params: object): string {
         return Object.keys(params)
             .map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`)
             .join('&');
     }
 
-    /**
-     * Converts duration in ISO 8601 format to milliseconds
-     *
-     * @param {string} duration The duration of the video
-     * @return {number} The duration in milliseconds
-     */
+    /** Converts duration in ISO 8601 format to milliseconds */
     private static parseVideoDuration(duration: string): number {
         return moment.duration(duration).asMilliseconds();
     }

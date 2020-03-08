@@ -5,7 +5,7 @@ import { BadRequestException, InternalServerException } from '../../util/excepti
 import findRemoveSync from 'find-remove';
 import ffmpeg, { setFfmpegPath } from 'fluent-ffmpeg';
 import ytdl from 'ytdl-core';
-import { resolve } from 'path';
+import { resolve, basename } from 'path';
 import fs from 'fs';
 import env from '../../util/environment';
 import md5 from 'md5';
@@ -13,8 +13,10 @@ import GrowingFile from 'growing-file';
 
 class CacheItem {
     private downloaded: boolean;
+    private hash: string;
 
-    constructor(downloaded: boolean = false) {
+    constructor(hash: string, downloaded: boolean = false) {
+        this.hash = hash;
         this.downloaded = downloaded;
     }
 
@@ -25,32 +27,53 @@ class CacheItem {
     public setDownloaded() {
         this.downloaded = true;
     }
+
+    public getHash(): string {
+        return this.hash;
+    }
 }
 
 export class YoutubeController {
     private static readonly SONG_PATH: string = '/cache/mp3';
     public songCache: CacheItem[];
     private allowedSongs: string[];
+    private deleteTask: NodeJS.Timeout;
 
     constructor() {
         this.songCache = [];
         this.allowedSongs = [];
+
         // The function is performed every 10 minutes to delete old song files.
         // YouTube audio links expire in 6 hours but we do this to save disk space.
-        const deleteTask = setInterval(this.deleteSongs, 600000);
+        this.deleteTask = setInterval(this.deleteSongs, 1000 * 60 * 10);
     }
 
-    // Removes mp3 files older than an hour.
+    // Removes mp3 files older than an hour from cache.
     private deleteSongs() {
-        findRemoveSync(env.__basedir + YoutubeController.SONG_PATH, {
-            files: '*.mp3',
-            age: {
-                seconds: 3600,
-            },
+        console.log('Deleting songs from cache');
+
+        // Returns an object containing all of the deleted files
+        let result = findRemoveSync(resolve(env.__basedir, `./${YoutubeController.SONG_PATH}`), {
+            extensions: '.mp3',
+            age: { seconds: 3600 },
         });
 
-        // Reset cache
-        this.songCache = [];
+        // Convert the object to an array
+        result = Object.keys(result);
+
+        // Map results to only contain the filename without an extension
+        result = result.map((item: string) => {
+            return basename(item, '.mp3');
+        });
+
+        // Remove deleted song files from cache
+        for (const hash of result) {
+            for (const videoId in this.songCache) {
+                if (this.songCache[videoId].getHash() === hash) {
+                    delete this.songCache[videoId];
+                }
+            }
+        }
     }
 
     public async search(req: Request, res: Response, next: NextFunction) {
@@ -131,7 +154,7 @@ export class YoutubeController {
                 writeStream.on('error', (err) => { console.log(err); });
 
                 // Create a new cache entry
-                this.songCache[videoId] = new CacheItem();
+                this.songCache[videoId] = new CacheItem(hash);
 
                 setFfmpegPath(env.FFMPEG_PATH);
 
@@ -146,7 +169,7 @@ export class YoutubeController {
                         if (this.songCache[videoId]) {
                             this.songCache[videoId].setDownloaded();
                         } else {
-                            this.songCache[videoId] = new CacheItem(true);
+                            this.songCache[videoId] = new CacheItem(hash, true);
                         }
 
                         this.streamSong(res, next, videoId);
@@ -192,7 +215,7 @@ export class YoutubeController {
                 writeStream.on('error', (err) => { console.log(err); });
 
                 // Create a new cache entry
-                this.songCache[videoId] = new CacheItem();
+                this.songCache[videoId] = new CacheItem(hash);
 
                 setFfmpegPath(env.FFMPEG_PATH);
 
@@ -207,7 +230,7 @@ export class YoutubeController {
                         if (this.songCache[videoId]) {
                             this.songCache[videoId].setDownloaded();
                         } else {
-                            this.songCache[videoId] = new CacheItem(true);
+                            this.songCache[videoId] = new CacheItem(hash, true);
                         }
                     })
                     .pipe(writeStream, { end: true });
@@ -293,7 +316,7 @@ export class YoutubeController {
                 return next(new BadRequestException('Required parameter \'videoId\' is missing'));
             }
 
-            const result = await YoutubeService.checkVideoExists(videoId);
+            const result = await YoutubeService.isVideoValid(videoId);
             return res.json({ success: result });
         } catch (err) {
             return next(new InternalServerException(err));
@@ -359,6 +382,10 @@ export class YoutubeController {
                 return next(new BadRequestException('Required parameter \'v\' missing'));
             }
 
+            if (!ytdl.validateID(videoId)) {
+                return next(new BadRequestException('Invalid parameter \'v\' provided'));
+            }
+
             // Song is already in cache
             if (this.songCache[videoId]) {
                 return API.response(res, 'The requested song is already in cache');
@@ -371,6 +398,7 @@ export class YoutubeController {
 
             audio.on('error', (err) => next(new Error('Could not play the song: ' + err.message)));
 
+            // We have to work with this event since 'response' is not always called
             let isResolved = false;
             audio.on('progress', () => {
                 if (!isResolved) {
@@ -378,7 +406,7 @@ export class YoutubeController {
                     writeStream.on('error', (err) => next(new Error('Could not write to file: ' + err.message)));
 
                     // Create a new cache entry
-                    this.songCache[videoId] = new CacheItem();
+                    this.songCache[videoId] = new CacheItem(hash);
 
                     setFfmpegPath(env.FFMPEG_PATH);
 
@@ -391,7 +419,7 @@ export class YoutubeController {
                             if (this.songCache[videoId]) {
                                 this.songCache[videoId].setDownloaded();
                             } else {
-                                this.songCache[videoId] = new CacheItem(true);
+                                this.songCache[videoId] = new CacheItem(hash, true);
                             }
                         })
                         .pipe(writeStream, { end: true });
@@ -411,6 +439,10 @@ export class YoutubeController {
 
             if (!videoId) {
                 return next(new BadRequestException('Required parameter \'v\' missing'));
+            }
+
+            if (!ytdl.validateID(videoId)) {
+                return next(new BadRequestException('Invalid parameter \'v\' provided'));
             }
 
             if (this.allowedSongs.indexOf(videoId) !== -1) {
