@@ -161,7 +161,7 @@ export class YoutubeService {
                 format: 'json',
                 url: this.VIDEO_URL + videoId,
             };
-            const queryRes = await http(`${this.OEMBED_URL}?${this.buildQuery(params)}`);
+            const queryRes = await fetch(`${this.OEMBED_URL}?${this.buildQuery(params)}`);
             return (queryRes.status === 200);
         } catch (err) {
             throw new Error(`Error checking whether video exists: ${err.message}`);
