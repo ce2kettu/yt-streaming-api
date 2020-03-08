@@ -133,7 +133,12 @@ export class YoutubeController {
         try {
             const videoId = req.params.videoId;
             const result = await YoutubeService.isVideoValid(videoId);
-            return res.json({ success: result });
+
+            if (result) {
+                return API.response(res, 'Video is valid');
+            }
+
+            return API.error(res, 'Invalid video');
         } catch (err) {
             return next(new InternalServerException(err));
         }
