@@ -36,6 +36,18 @@ yarn install
 chmod -R 777 cache
 ```
 
+##### Modify environt variables
+Open `.env.development` or `.env.production` depending on your mode and modify the contents to fit your configuration.
+Example:
+```env
+YT_API_KEY=AIzaSy...
+API_KEY=not_so_secure
+APP_PORT=3000
+APP_HOST=localhost
+APP_PROTOCOL=http
+FFMPEG_PATH=ffmpeg
+```
+
 ##### Run in production mode
 ```shell
 yarn run start:prod
@@ -45,11 +57,9 @@ yarn run start:prod
 yarn start
 ```
 
-## List of Routes
+## List of API Routes
 
 ```sh
-# API Routes:
-
 +--------+-------------------------+
   Method | URI
 +--------+-------------------------+
