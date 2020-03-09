@@ -12,6 +12,7 @@ export class HttpException extends Error {
 
 export class InternalServerException extends HttpException {
     constructor(message?: string) {
+        console.log('[ERROR]: ' + message);
         message = (env.NODE_ENV === 'development') ? message : 'Something went wrong';
         super(message);
     }
