@@ -12,5 +12,10 @@ RUN chmod -R 777 /usr/src/app/cache
 # Install app dependencies
 RUN yarn install
 
+# Install FFmpeg
+RUN apk update
+RUN apk upgrade
+RUN apk add ffmpeg
+
 # Build and run the app
-CMD npm run start:prod
+CMD yarn run start:prod
