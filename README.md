@@ -9,15 +9,14 @@ This is an open source backend that can be deployed to any infrastructure that c
 This API works on top of the *Express* web application framework. It's used as a standalone application and is easily expandable due to it's modular structure.
 
 ## Requirements
-Install [Node.js and NPM](https://nodejs.org/en/download/)
+Install Node.js
+- [Node.js](https://nodejs.org/en/download/) v12.16.1 or newer
 
-- on OSX use [homebrew](http://brew.sh) `brew install node`
-- on Windows use [chocolatey](https://chocolatey.org/) `choco install nodejs`
+Install yarn
+- [Yarn](https://yarnpkg.com/) package manager
 
-Install yarn globally
-```shell
-yarn global add yarn
-```
+Install FFmpeg
+- [FFmpeg](https://www.ffmpeg.org/) a complete, cross-platform solution to record, convert and stream audio and video
 
 ## Getting Started
 
@@ -50,11 +49,11 @@ FFMPEG_PATH=ffmpeg
 
 ##### Run in production mode
 ```shell
-npm run start:prod
+yarn run start:prod
 ```
 ##### Run in development mode
 ```shell
-npm start
+yarn start
 ```
 
 ## Docker
