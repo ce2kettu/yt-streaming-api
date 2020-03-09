@@ -79,36 +79,88 @@ export class YoutubeController {
     }
 
     /** Sets the correct headers for the response to serve audio */
-    private setSongHeaders(hash: string, res: Response) {
-        res.writeHead(200, {
-            'Content-Type': 'audio/mpeg',
-            'Content-Disposition': `inline; filename="${hash}.mp3"`,
-            'Connection': 'Keep-Alive',
-        });
+    private setSongHeaders(videoId: string, res: Response) {
+        if (!res.headersSent) {
+            res.writeHead(200, {
+                'Content-Type': 'audio/mpeg',
+                'Content-Disposition': `inline; filename="${md5(videoId)}.mp3"`,
+                'Connection': 'Keep-Alive',
+            });
+        }
     }
 
     /** Opens a file and streams it to the client */
-    private streamFile(filePath: string, res: Response, next: NextFunction) {
-        const file = GrowingFile.open(filePath, YoutubeController.FILE_OPTIONS);
-        file.on('error', (err) => next(new InternalServerException('Could not read the file: ' + err.message)));
+    private streamSong(videoId: string, res: Response, next: NextFunction) {
+        this.setSongHeaders(videoId, res);
+        const file = GrowingFile.open(this.getSongPath(videoId), YoutubeController.FILE_OPTIONS);
+        file.on('error', (err) => {
+            res.end();
+            file.destroy();
+            next(new InternalServerException('Could not read the file: ' + err));
+        });
         file.pipe(res);
     }
 
+    /** Deletes a song from the cache */
+    private deleteSongFromCache(videoId: string) {
+        delete this.songCache[videoId];
+    }
+
+    /** Returns absolute song path */
+    private getSongPath(videoId: string) {
+        return resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${md5(videoId)}.mp3`);
+    }
+
     /** Converts the audio stream to mp3 and adds the song to cache  */
-    private addSongToCache(videoId: string, filePath: string, audioStream: any, next: NextFunction) {
-        const writeStream = fs.createWriteStream(filePath);
-        writeStream.on('error', (err) => next(new InternalServerException('Could not write to file: ' + err.message)));
+    private async addSongToCache(videoId: string): Promise<boolean> {
+        if (this.songCache[videoId]) {
+            return true;
+        }
 
         // Create a new cache entry
         this.songCache[videoId] = new CacheItem(md5(videoId));
 
-        // Convert stream to compressed mp3 audio
-        ffmpeg(audioStream)
-            .audioBitrate(128)
-            .format('mp3')
-            .on('error', (err) => console.log(err))
-            .on('end', () => this.songCache[videoId].setDownloaded())
-            .pipe(writeStream);
+        return new Promise<boolean>((songResolve, songReject) => {
+            let earlyExit = false;
+
+            // Get the actual audio
+            const audio = ytdl(videoId, { quality: 'highestaudio' });
+            audio.on('error', (err) => {
+                this.deleteSongFromCache(videoId);
+                songReject(new Error('Could not play the song: ' + err));
+                audio.destroy();
+                earlyExit = true;
+            });
+
+            if (earlyExit) { return; }
+
+            // We have to work with this event since 'response' is not always called
+            audio.once('progress', () => {
+                const filePath = this.getSongPath(videoId);
+                const writeStream = fs.createWriteStream(filePath);
+                writeStream.once('error', (err) => {
+                    songReject(new Error('Could not write to file: ' + err));
+                    audio.destroy();
+                    earlyExit = true;
+                });
+
+                if (earlyExit) { return; }
+
+                // Convert stream to compressed mp3 audio
+                ffmpeg(audio)
+                    .audioBitrate(128)
+                    .format('mp3')
+                    .once('start', () => songResolve(true))
+                    .on('error', (err) => {
+                        this.deleteSongFromCache(videoId);
+                        songReject(new Error('FFmpeg error:' + err));
+                        audio.destroy();
+                        writeStream.destroy();
+                    })
+                    .once('end', () => this.songCache[videoId].setDownloaded())
+                    .pipe(writeStream);
+            });
+        });
     }
 
     /** Returns search result */
@@ -180,21 +232,18 @@ export class YoutubeController {
     public async streamClient(req: Request, res: Response, next: NextFunction) {
         try {
             const videoId = req.params.videoId;
-            const hash = md5(videoId);
-            const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
-
-            this.setSongHeaders(hash, res);
 
             // Video is in cache
             if (this.songCache[videoId]) {
-                this.streamFile(filePath, res, next);
+                this.streamSong(videoId, res, next);
             } else {
-                const audio = ytdl(videoId, { quality: 'highestaudio' });
-                audio.on('error', (err) =>
-                    next(new InternalServerException('Could not play the song: ' + err.message)));
+                const result = await this.addSongToCache(videoId);
 
-                this.addSongToCache(videoId, filePath, audio, next);
-                this.streamFile(filePath, res, next);
+                if (result === true) {
+                    return this.streamSong(videoId, res, next);
+                }
+
+                return API.error(res, 'Could not play the song');
             }
         } catch (err) {
             return next(new InternalServerException(err));
@@ -205,13 +254,10 @@ export class YoutubeController {
     public async streamChunked(req: Request, res: Response, next: NextFunction) {
         try {
             const videoId = req.params.videoId;
-            const hash = md5(videoId);
-            const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
 
             // Video is in cache
             if (this.songCache[videoId]) {
-                this.setSongHeaders(hash, res);
-                this.streamFile(filePath, res, next);
+                this.streamSong(videoId, res, next);
             } else {
                 return API.error(res, 'Video is not in cache');
             }
@@ -230,21 +276,13 @@ export class YoutubeController {
                 return API.response(res, 'The requested song is already in cache');
             }
 
-            const hash = md5(videoId);
-            const filePath = resolve(env.__basedir, `./${YoutubeController.SONG_PATH}/${hash}.mp3`);
-            const audio = ytdl(videoId, { quality: 'highestaudio' });
-            audio.on('error', (err) => next(new InternalServerException('Could not play the song: ' + err.message)));
+            const result = await this.addSongToCache(videoId);
 
-            // We have to work with this event since 'response' is not always called
-            let isResolved = false;
-            audio.on('progress', () => {
-                if (!isResolved) {
-                    this.addSongToCache(videoId, filePath, audio, next);
+            if (result === true) {
+                return API.response(res, 'The requested song is now being downloaded');
+            }
 
-                    isResolved = true;
-                    return API.response(res, 'The requested song is now being downloaded');
-                }
-            });
+            return API.error(res, 'Could not download the song');
         } catch (err) {
             return next(new InternalServerException(err));
         }
