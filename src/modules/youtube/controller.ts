@@ -149,7 +149,12 @@ export class YoutubeController {
         try {
             const videoId = req.params.videoId;
             const result = await YoutubeService.getVideoInfo(videoId);
-            return API.response(res, 'Retrieved song data', result);
+
+            if (result) {
+                return API.response(res, 'Retrieved song data', result);
+            }
+
+            return API.error(res, 'Could not get song data');
         } catch (err) {
             return next(new InternalServerException(err));
         }
@@ -160,7 +165,12 @@ export class YoutubeController {
         try {
             const playlistId = req.params.playlistId;
             const result = await YoutubeService.getPlaylistData(playlistId);
-            return API.response(res, 'Retrieved playlist data', result);
+
+            if (result) {
+                return API.response(res, 'Retrieved playlist data', result);
+            }
+
+            return API.error(res, 'Could not get playlist data');
         } catch (err) {
             return next(new InternalServerException(err));
         }

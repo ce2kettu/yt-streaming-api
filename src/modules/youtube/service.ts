@@ -128,6 +128,8 @@ export class YoutubeService {
             };
             const queryRes = await http(`${this.API_URL}/playlistItems?${this.buildQuery(params)}`);
 
+            if (!queryRes.body.items) { return null; }
+
             let videoIds: string[] = queryRes.body?.items.map((obj: any) => {
                 return obj.snippet.resourceId.videoId;
             });
