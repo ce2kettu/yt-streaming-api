@@ -20,7 +20,7 @@ export class Server {
     }
 
     public start() {
-        this.app.listen(env.APP_PORT, () => {
+        const server = this.app.listen(env.APP_PORT, () => {
             console.log(`Youtube streaming API running on ${env.APP_PROTOCOL}://${env.APP_HOST}:${env.APP_PORT}`);
         }).on('error', (err) => {
             console.log(err);

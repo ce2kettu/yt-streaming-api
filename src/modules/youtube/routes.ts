@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { YoutubeController } from './controller';
-import { apiKey, validateVideoId, validatePlaylistId, timeout } from '../../middleware';
+import { apiKey, validateVideoId, validatePlaylistId } from '../../middleware';
 
 export class YoutubeRoutes {
     public router: Router;
@@ -14,9 +14,6 @@ export class YoutubeRoutes {
 
     // tslint:disable: max-line-length
     public routes() {
-        // Use timeout for all routes
-        this.router.use(timeout);
-
         this.router.get('/search', apiKey, this.controller.search.bind(this.controller));
         this.router.get('/stream/:videoId', validateVideoId, this.controller.streamClient.bind(this.controller));
         this.router.get('/stream/chunked/:videoId', validateVideoId, this.controller.streamChunked.bind(this.controller));
