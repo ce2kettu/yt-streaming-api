@@ -46,7 +46,7 @@ export class YoutubeController {
 
         // The function is performed every 10 minutes to delete old song files.
         // YouTube audio links expire in 6 hours but we do this to save disk space.
-        this.deleteTask = setInterval(this.deleteSongs, 1000 * 60 * 10);
+        this.deleteTask = setInterval(this.deleteSongs.bind(this), 1000 * 60 * 10);
 
         // Set correct path for ffmpeg binary
         setFfmpegPath(env.FFMPEG_PATH);
