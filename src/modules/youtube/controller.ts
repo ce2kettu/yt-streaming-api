@@ -103,7 +103,8 @@ export class YoutubeController {
 
     /** Deletes a song from the cache */
     private deleteSongFromCache(videoId: string) {
-        delete this.songCache[videoId];
+        if (this.songCache[videoId]) 
+            delete this.songCache[videoId];
     }
 
     /** Returns absolute song path */
@@ -117,14 +118,12 @@ export class YoutubeController {
             return true;
         }
 
-        // Create a new cache entry
-        this.songCache[videoId] = new CacheItem(md5(videoId));
-
         return new Promise<boolean>((songResolve, songReject) => {
             let earlyExit = false;
 
             // Get the actual audio
             const audio = ytdl(videoId, { quality: 'highestaudio' });
+
             audio.on('error', (err) => {
                 this.deleteSongFromCache(videoId);
                 songReject(new Error('Could not play the song: ' + err));
@@ -136,9 +135,12 @@ export class YoutubeController {
 
             // We have to work with this event since 'response' is not always called
             audio.once('progress', () => {
+                // Create a new cache entry
+                this.songCache[videoId] = new CacheItem(md5(videoId));
+
                 const filePath = this.getSongPath(videoId);
                 const writeStream = fs.createWriteStream(filePath);
-                writeStream.once('error', (err) => {
+                writeStream.on('error', (err) => {
                     songReject(new Error('Could not write to file: ' + err));
                     audio.destroy();
                     earlyExit = true;
