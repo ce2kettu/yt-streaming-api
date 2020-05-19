@@ -37,7 +37,7 @@
     "moment": "^2.24.0",
     "morgan": "^1.9.1",
     "node-fetch": "^2.6.0",
-    "ytdl-core": "^1.0.9"
+    "ytdl-core": "^2.0.1"
   },
   "devDependencies": {
     "@types/compression": "^1.0.1",
