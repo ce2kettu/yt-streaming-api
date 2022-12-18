@@ -21,5 +21,6 @@ export class YoutubeRoutes {
         this.router.get('/verify/:videoId', validateVideoId, apiKey, this.controller.checkVideoExists.bind(this.controller));
         this.router.get('/song/:videoId', validateVideoId, apiKey, this.controller.getSongInfo.bind(this.controller));
         this.router.get('/playlist/:playlistId', validatePlaylistId, apiKey, this.controller.getPlaylistInfo.bind(this.controller));
+        this.router.get('/playlist/:playlistId/m3u', validatePlaylistId, apiKey, this.controller.playListToM3U.bind(this.controller));
     }
 }

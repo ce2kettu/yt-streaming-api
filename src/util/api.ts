@@ -16,4 +16,9 @@ export class API {
 
         res.status(status).json({ success: false, message });
     }
+
+    public static plain(res: Response, data?: any, status?: number) {
+        status = status || HttpStatus.OK;
+        res.status(status).send(data);
+    }
 }

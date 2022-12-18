@@ -4,3 +4,4 @@ node_modules
 dist/
 cache/mp3/*.mp3
 *.tar
+.history
