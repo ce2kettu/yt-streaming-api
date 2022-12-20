@@ -16,4 +16,11 @@ export class API {
 
         res.status(status).json({ success: false, message });
     }
+
+    public static plain(res: Response, status?: number, headers?: Record<string, any>, data?: any) {
+        status = status || HttpStatus.OK;
+        res.writeHead(status, headers);
+        res.write(data);
+        res.end();
+    }
 }

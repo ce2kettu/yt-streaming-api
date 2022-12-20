@@ -230,6 +230,29 @@ export class YoutubeController {
         }
     }
 
+    /** Returns playlist data as m3u */
+    public async playListToM3U(req: Request, res: Response, next: NextFunction) {
+        try {
+            const playlistId = req.params.playlistId;
+            const result = await YoutubeService.getPlaylistData(playlistId);
+
+            if (result) {
+                let m3uResult = `#EXTM3U\n`;
+                result.forEach(videoId => m3uResult += `${env.APP_PROTOCOL}://${env.APP_HOST}:${env.APP_PORT}/api/music/stream/${videoId}\n`);
+
+                return API.plain(res, 200, {
+                    'Content-Type': 'audio/x-mpegurl',
+                    'Content-Disposition': `inline; filename="${md5(playlistId)}.m3u"`,
+                    'Connection': 'Keep-Alive',
+                }, m3uResult);
+            }
+
+            return API.error(res, 'Could not get playlist data');
+        } catch (err) {
+            return next(new InternalServerException(err));
+        }
+    }
+
     /** Streams a song to the client without validation */
     public async streamClient(req: Request, res: Response, next: NextFunction) {
         try {
