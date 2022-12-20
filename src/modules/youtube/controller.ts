@@ -239,7 +239,12 @@ export class YoutubeController {
             if (result) {
                 let m3uResult = `#EXTM3U\n`;
                 result.forEach(videoId => m3uResult += `${env.APP_PROTOCOL}://${env.APP_HOST}:${env.APP_PORT}/api/music/stream/${videoId}\n`);
-                return API.plain(res, m3uResult);
+
+                return API.plain(res, 200, {
+                    'Content-Type': 'audio/x-mpegurl',
+                    'Content-Disposition': `inline; filename="${md5(playlistId)}.m3u"`,
+                    'Connection': 'Keep-Alive',
+                }, m3uResult);
             }
 
             return API.error(res, 'Could not get playlist data');

@@ -5,3 +5,4 @@ dist/
 cache/mp3/*.mp3
 *.tar
 .history
+.env
